@@ -8,6 +8,8 @@ import pytz
 from homeassistant.util import dt as dt_util
 from pytz import timezone
 
+from datetime import timedelta, datetime
+
 UTC = pytz.utc
 
 __all__ = [
@@ -55,8 +57,12 @@ def stock(d):
     return d.astimezone(stockholm_tz)
 
 
-def start_of(d, typ_="hour"):
-    if typ_ == "hour":
+def start_of(d: datetime, typ_="hour") -> datetime:
+    if typ_ == "quarter":
+        remainder = d.minute % 15
+        floored_d = d - timedelta(minutes=remainder)
+        return floored_d.replace(second=0, microsecond=0)
+    elif typ_ == "hour":
         return d.replace(minute=0, second=0, microsecond=0)
     elif typ_ == "day":
         return d.replace(hour=0, minute=0, microsecond=0)
@@ -70,9 +76,12 @@ def time_in_range(start, end, x):
         return start <= x or x <= end
 
 
-def end_of(d, typ_="hour"):
+def end_of(d: datetime, typ_="hour") -> datetime:
     """Return end our hour"""
-    if typ_ == "hour":
+    if typ_ == "quarter":
+        start = start_of(d, "quarter")
+        return start + timedelta(minutes=15, microseconds=-1)
+    elif typ_ == "hour":
         return d.replace(minute=59, second=59, microsecond=999999)
     elif typ_ == "day":
         return d.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -123,10 +132,11 @@ def extract_attrs(data) -> dict:
     items = [i.get("value") for i in data]
 
     if len(data):
+        SLOTS_PER_HOUR = len(data) / 24
         data = sorted(data, key=itemgetter("start"))
-        offpeak1 = [i.get("value") for i in data[0:8]]
-        peak = [i.get("value") for i in data[8:20]]
-        offpeak2 = [i.get("value") for i in data[20:]]
+        offpeak1 = [i.get("value") for i in data[0:int(8*SLOTS_PER_HOUR)]]
+        peak = [i.get("value") for i in data[int(8*SLOTS_PER_HOUR):int(20*SLOTS_PER_HOUR)]]
+        offpeak2 = [i.get("value") for i in data[int(20*SLOTS_PER_HOUR):]]
 
         d["Peak"] = mean(peak)
         d["Off-peak 1"] = mean(offpeak1)

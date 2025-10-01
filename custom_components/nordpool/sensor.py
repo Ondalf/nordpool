@@ -307,13 +307,16 @@ class NordpoolSensor(SensorEntity):
             _LOGGER.debug("No data for today, unable to set attrs")
             return
 
+        SLOTS_PER_HOUR = len(today) / 24
+
         self._average = mean(today)
         self._min = min(today)
         self._max = max(today)
-        self._off_peak_1 = mean(today[0:8])
-        self._off_peak_2 = mean(today[20:])
-        self._peak = mean(today[8:20])
         self._mean = median(today)
+
+        self._off_peak_1 = mean(today[0:int(8*SLOTS_PER_HOUR)])
+        self._off_peak_2 = mean(today[int(20*SLOTS_PER_HOUR):])
+        self._peak = mean(today[int(8*SLOTS_PER_HOUR):int(20*SLOTS_PER_HOUR)])
 
     @property
     def current_price(self) -> float:
@@ -429,7 +432,7 @@ class NordpoolSensor(SensorEntity):
         data = await self._api.today(self._area, self._currency)
         if data:
             for item in self._someday(data):
-                if item["start"] == start_of(local_now, "hour"):
+                if item["start"] <= local_now < item["end"]:
                     self._current_price = item["value"]
                     _LOGGER.debug(
                         "Updated %s _current_price %s", self.name, item["value"]
